@@ -1,0 +1,23 @@
+{
+  "name": "audio-visualizer",
+  "version": "1.0.0",
+  "description": "Audio visualizer project",
+  "main": "index.js",
+  "scripts": {
+    "build:backend": "npx tsc -p backend/tsconfig.json", 
+    "start:backend": "npm run build:backend && node backend/dist/executable.js", 
+    "build:frontend": "npx tsc -p frontend/tsconfig.json", 
+    "start:frontend": "npm run build:frontend && lite-server --baseDir=frontend/dist", 
+    "start": "npm run start:backend & npm run start:frontend",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "lite-server": "^2.6.1",
+    "typescript": "^5.7.3"
+  },
+  "type": "module"
+}
+

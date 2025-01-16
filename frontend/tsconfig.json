@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "es2016",
+    "module": "esnext",
+    "lib": ["dom", "es2016"],
+    "outDir": "dist",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*", "src/app.ts", "backend/src/executable.ts"],
+  "exclude": ["node_modules"]
+}
+
