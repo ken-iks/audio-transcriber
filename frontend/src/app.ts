@@ -39,7 +39,8 @@ async function get_physical_output(): Promise<string> {
     stream.forEach(
         (x) => {if 
             (x.kind == "audiooutput" && x.label.includes("MacBook")) {
-            return x.deviceId;
+                console.log(x);
+                return x.deviceId;
             }
         }
     );
@@ -76,7 +77,63 @@ function play(stream: MediaStream): void {
     log_audio_stream();
 }
 
-async function record_from_blackhole(): Promise<void>  {
+/*
+    Recording section for getting blobs from stream and sending them to backend
+*/
+
+interface Recorder {
+    start: () => void;
+    stop: () => Blob | null;
+}
+
+function send_blobs(stream: MediaStream) : Recorder {
+    let media_recorder: MediaRecorder | null = null;
+    let audio_chunks: Blob[] = [];
+    let is_recording: boolean = false;
+
+    return {
+        start: () => {
+            if (is_recording) {
+                console.warn("Recording is already in progress.");
+                return;
+            }
+            media_recorder = new MediaRecorder(stream);
+
+            media_recorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audio_chunks.push(event.data);
+                    console.log("Audio chunk created:", event.data);
+                }
+            };
+
+            media_recorder.start(3000); // Trigger `ondataavailable` every 3 seconds
+            is_recording = true;
+            console.log("Recording started...");
+        },
+
+        stop: () => {
+            if (!is_recording || !media_recorder) {
+                console.warn("No recording is in progress to stop.");
+                return null;
+            }
+
+            media_recorder.stop();
+            is_recording = false;
+            console.log("Recording stopped.");
+
+            const final_blob = new Blob(audio_chunks, { type: "audio/webm" });
+            console.log("Final Blob:", final_blob);
+
+            // Reset audio_chunks for the next recording session
+            audio_chunks = [];
+
+            // Return the final blob for further processing
+            return final_blob;
+        }
+    };
+}
+
+async function record_from_blackhole(): Promise<Recorder | null >  {
     try {
         let virtual_input_id: string;
         virtual_input_id = await get_virtual_input();
@@ -86,19 +143,38 @@ async function record_from_blackhole(): Promise<void>  {
         });
         console.log("MEDIA LOG GOTTEN");
         console.log(media_stream);
-        //start(media_stream);
+        start(media_stream);
         play(media_stream);
+        return send_blobs(media_stream);
+
     } catch (error) {
         console.error("Couldn't resolve blackhole input:", error);
+        return null;
     } 
 }
 
 async function main(): Promise<number> {
     try {
-        console.log("Attempting switch audio output to Blackhole");
-        switch_output_device("blackhole");
+        //console.log("Attempting switch audio output to Blackhole");
+        //switch_output_device("blackhole");
         console.log("Attempting to listen to blackhole audio input");
-        record_from_blackhole();
+
+        const rec = record_from_blackhole();
+        console.log("Attempting to create 10 seconds worth of audioblobs");
+
+        (rec).then(
+            (x) => {
+                if (x) {
+                    x.start();
+                    setTimeout(() => {
+                        const finalBlob = x.stop();
+                        if (finalBlob) {
+                            console.log("Final Blob:", finalBlob);
+                        }
+                    }, 10000);
+                }      
+                }
+        );
         return 0;
     } catch {
         return -1;

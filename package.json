@@ -9,7 +9,8 @@
     "build:frontend": "npx tsc -p frontend/tsconfig.json", 
     "start:frontend": "npm run build:frontend && lite-server --baseDir=frontend/dist", 
     "start": "npm run start:backend & npm run start:frontend",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "clean": "rm -rf frontend/dist && rm -rf backend/dist"
   },
   "keywords": [],
   "author": "",

@@ -7,6 +7,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+import { start } from './visualizer.js';
 console.log("Script loaded");
 function get_media() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -45,6 +46,7 @@ function get_physical_output() {
         const stream = yield navigator.mediaDevices.enumerateDevices();
         stream.forEach((x) => {
             if (x.kind == "audiooutput" && x.label.includes("MacBook")) {
+                console.log(x);
                 return x.deviceId;
             }
         });
@@ -80,6 +82,44 @@ function play(stream) {
     ;
     log_audio_stream();
 }
+function send_blobs(stream) {
+    let media_recorder = null;
+    let audio_chunks = [];
+    let is_recording = false;
+    return {
+        start: () => {
+            if (is_recording) {
+                console.warn("Recording is already in progress.");
+                return;
+            }
+            media_recorder = new MediaRecorder(stream);
+            media_recorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audio_chunks.push(event.data);
+                    console.log("Audio chunk created:", event.data);
+                }
+            };
+            media_recorder.start(3000); // Trigger `ondataavailable` every 3 seconds
+            is_recording = true;
+            console.log("Recording started...");
+        },
+        stop: () => {
+            if (!is_recording || !media_recorder) {
+                console.warn("No recording is in progress to stop.");
+                return null;
+            }
+            media_recorder.stop();
+            is_recording = false;
+            console.log("Recording stopped.");
+            const final_blob = new Blob(audio_chunks, { type: "audio/webm" });
+            console.log("Final Blob:", final_blob);
+            // Reset audio_chunks for the next recording session
+            audio_chunks = [];
+            // Return the final blob for further processing
+            return final_blob;
+        }
+    };
+}
 function record_from_blackhole() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -91,21 +131,35 @@ function record_from_blackhole() {
             });
             console.log("MEDIA LOG GOTTEN");
             console.log(media_stream);
-            //start(media_stream);
+            start(media_stream);
             play(media_stream);
+            return send_blobs(media_stream);
         }
         catch (error) {
             console.error("Couldn't resolve blackhole input:", error);
+            return null;
         }
     });
 }
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            console.log("Attempting switch audio output to Blackhole");
-            switch_output_device("blackhole");
+            //console.log("Attempting switch audio output to Blackhole");
+            //switch_output_device("blackhole");
             console.log("Attempting to listen to blackhole audio input");
-            record_from_blackhole();
+            const rec = record_from_blackhole();
+            console.log("Attempting to create 10 seconds worth of audioblobs");
+            (rec).then((x) => {
+                if (x) {
+                    x.start();
+                    setTimeout(() => {
+                        const finalBlob = x.stop();
+                        if (finalBlob) {
+                            console.log("Final Blob:", finalBlob);
+                        }
+                    }, 10000);
+                }
+            });
             return 0;
         }
         catch (_a) {
@@ -114,5 +168,4 @@ function main() {
     });
 }
 main();
-export {};
 //# sourceMappingURL=app.js.map
