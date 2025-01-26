@@ -59,6 +59,11 @@ async function switch_output_device(device: string): Promise<void> {
     }
 };
 
+/**
+ * 
+ * Testing the input stream by generating audio visulization
+ */
+
 function play(stream: MediaStream): void {
     const context = new AudioContext();
     const source = context.createMediaStreamSource(stream);
@@ -86,6 +91,26 @@ interface Recorder {
     stop: () => Blob | null;
 }
 
+/**
+ * Send audio chunks to backend for transcription
+ */
+
+async function transcibe(event_data: Blob): Promise<void> {
+    try {
+        const response = fetch("http://localhost:3000/receive-audio", {
+            method: "POST",
+            body: event_data,
+            headers: {
+                "Content-Type": "audio/webm",
+            },
+        });
+        const result = await (await response).json();
+        console.log("Transcription result:", result.transcription);
+    } catch (error) {
+        console.error("Error communicating with backend:", error);
+    }
+}
+
 function send_blobs(stream: MediaStream) : Recorder {
     let media_recorder: MediaRecorder | null = null;
     let audio_chunks: Blob[] = [];
@@ -103,6 +128,10 @@ function send_blobs(stream: MediaStream) : Recorder {
                 if (event.data.size > 0) {
                     audio_chunks.push(event.data);
                     console.log("Audio chunk created:", event.data);
+                    console.log("Attempting Transcription");
+                    // SENDING MOST RECENT BLOB TO BACKEND
+                    transcibe(audio_chunks[audio_chunks.length - 1]);
+                    // TEST
                 }
             };
 
@@ -143,8 +172,6 @@ async function record_from_blackhole(): Promise<Recorder | null >  {
         });
         console.log("MEDIA LOG GOTTEN");
         console.log(media_stream);
-        start(media_stream);
-        play(media_stream);
         return send_blobs(media_stream);
 
     } catch (error) {
@@ -158,10 +185,9 @@ async function main(): Promise<number> {
         //console.log("Attempting switch audio output to Blackhole");
         //switch_output_device("blackhole");
         console.log("Attempting to listen to blackhole audio input");
-
         const rec = record_from_blackhole();
         console.log("Attempting to create 10 seconds worth of audioblobs");
-
+        
         (rec).then(
             (x) => {
                 if (x) {
@@ -175,6 +201,7 @@ async function main(): Promise<number> {
                 }      
                 }
         );
+    
         return 0;
     } catch {
         return -1;

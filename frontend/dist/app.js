@@ -7,7 +7,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import { start } from './visualizer.js';
 console.log("Script loaded");
 function get_media() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -66,6 +65,10 @@ function switch_output_device(device) {
     });
 }
 ;
+/**
+ *
+ * Testing the input stream by generating audio visulization
+ */
 function play(stream) {
     const context = new AudioContext();
     const source = context.createMediaStreamSource(stream);
@@ -82,6 +85,27 @@ function play(stream) {
     ;
     log_audio_stream();
 }
+/**
+ * Send audio chunks to backend for transcription
+ */
+function transcibe(event_data) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const response = fetch("http://localhost:3000/receive-audio", {
+                method: "POST",
+                body: event_data,
+                headers: {
+                    "Content-Type": "audio/webm",
+                },
+            });
+            const result = yield (yield response).json();
+            console.log("Transcription result:", result.transcription);
+        }
+        catch (error) {
+            console.error("Error communicating with backend:", error);
+        }
+    });
+}
 function send_blobs(stream) {
     let media_recorder = null;
     let audio_chunks = [];
@@ -97,6 +121,10 @@ function send_blobs(stream) {
                 if (event.data.size > 0) {
                     audio_chunks.push(event.data);
                     console.log("Audio chunk created:", event.data);
+                    console.log("Attempting Transcription");
+                    // SENDING MOST RECENT BLOB TO BACKEND
+                    transcibe(audio_chunks[audio_chunks.length - 1]);
+                    // TEST
                 }
             };
             media_recorder.start(3000); // Trigger `ondataavailable` every 3 seconds
@@ -131,8 +159,6 @@ function record_from_blackhole() {
             });
             console.log("MEDIA LOG GOTTEN");
             console.log(media_stream);
-            start(media_stream);
-            play(media_stream);
             return send_blobs(media_stream);
         }
         catch (error) {
@@ -168,4 +194,5 @@ function main() {
     });
 }
 main();
+export {};
 //# sourceMappingURL=app.js.map
