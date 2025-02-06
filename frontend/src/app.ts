@@ -1,5 +1,11 @@
 import { start } from './visualizer.js';
 
+/**
+ * 
+ * Goal: Build a free real time transcription service that just runs as continous partial transcription (which I can get for free)
+ *       This will be the full scope of the project so that I can move on to something more interesting
+ */
+
 console.log("Script loaded");
 
 async function get_media(): Promise<Array<MediaDeviceInfo>> {
@@ -50,8 +56,8 @@ async function get_physical_output(): Promise<string> {
 async function switch_output_device(device: string): Promise<void> {
     try {
         const response = await fetch(`http://localhost:3000/run-audio-control?device=${device}`);
-        const output = await response.text();
-        console.log("Output from server:", output);
+        //const output = await response.text();
+        //console.log("Output from server:", output);
 
     } catch (error) {
         console.error("Error communicating with backend:", error);
@@ -104,8 +110,8 @@ async function transcibe(event_data: Blob): Promise<void> {
                 "Content-Type": "audio/webm",
             },
         });
-        const result = await (await response).json();
-        console.log("Transcription result:", result.transcription);
+        //const result = await (await response).json();
+        //console.log("Transcription result:", result.transcription);
     } catch (error) {
         console.error("Error communicating with backend:", error);
     }
@@ -130,8 +136,9 @@ function send_blobs(stream: MediaStream) : Recorder {
                     console.log("Audio chunk created:", event.data);
                     console.log("Attempting Transcription");
                     // SENDING MOST RECENT BLOB TO BACKEND
-                    transcibe(audio_chunks[audio_chunks.length - 1]);
-                    // TEST
+                    if (audio_chunks.length > 0) {
+                        transcibe(audio_chunks[audio_chunks.length - 1]);
+                    }
                 }
             };
 
@@ -182,8 +189,8 @@ async function record_from_blackhole(): Promise<Recorder | null >  {
 
 async function main(): Promise<number> {
     try {
-        //console.log("Attempting switch audio output to Blackhole");
-        //switch_output_device("blackhole");
+        console.log("Attempting switch audio output to Blackhole");
+        switch_output_device("blackhole");
         console.log("Attempting to listen to blackhole audio input");
         const rec = record_from_blackhole();
         console.log("Attempting to create 10 seconds worth of audioblobs");

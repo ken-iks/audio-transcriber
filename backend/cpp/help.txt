@@ -2,4 +2,4 @@ For compiling the output_devices.cpp:
     clang -o output_devices output_devices.cpp -framework CoreAudio -framework CoreFoundation
 
 For compiling the audio_control.cpp:
-    clang++ -o build/audio_control src/cpp/audio_control.cpp -framework CoreAudio -framework CoreFoundation
+    clang++ -o build/audio_control cpp/audio_control.cpp -framework CoreAudio -framework CoreFoundation

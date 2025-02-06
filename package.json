@@ -4,10 +4,10 @@
   "description": "Audio visualizer project",
   "main": "index.js",
   "scripts": {
-    "build:backend": "npx tsc -p backend/tsconfig.json", 
-    "start:backend": "npm run build:backend && node backend/dist/executable.js", 
-    "build:frontend": "npx tsc -p frontend/tsconfig.json", 
-    "start:frontend": "npm run build:frontend && lite-server --baseDir=frontend/dist", 
+    "build:backend": "npx tsc -p backend/tsconfig.json",
+    "start:backend": "npm run build:backend && node backend/dist/executable.js",
+    "build:frontend": "npx tsc -p frontend/tsconfig.json",
+    "start:frontend": "npm run build:frontend && lite-server --baseDir=frontend/dist",
     "start": "npm run start:backend & npm run start:frontend",
     "test": "echo \"Error: no test specified\" && exit 1",
     "clean": "rm -rf frontend/dist && rm -rf backend/dist"
@@ -16,9 +16,15 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/node": "^22.13.1",
     "lite-server": "^2.6.1",
     "typescript": "^5.7.3"
   },
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "assemblyai": "^4.9.0",
+    "axios": "^1.7.9",
+    "axios-typescript": "^1.0.2",
+    "file-type": "^20.1.0"
+  }
 }
-

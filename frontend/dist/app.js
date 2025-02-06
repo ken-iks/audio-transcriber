@@ -56,8 +56,8 @@ function switch_output_device(device) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const response = yield fetch(`http://localhost:3000/run-audio-control?device=${device}`);
-            const output = yield response.text();
-            console.log("Output from server:", output);
+            //const output = await response.text();
+            //console.log("Output from server:", output);
         }
         catch (error) {
             console.error("Error communicating with backend:", error);
@@ -98,8 +98,8 @@ function transcibe(event_data) {
                     "Content-Type": "audio/webm",
                 },
             });
-            const result = yield (yield response).json();
-            console.log("Transcription result:", result.transcription);
+            //const result = await (await response).json();
+            //console.log("Transcription result:", result.transcription);
         }
         catch (error) {
             console.error("Error communicating with backend:", error);
@@ -123,8 +123,9 @@ function send_blobs(stream) {
                     console.log("Audio chunk created:", event.data);
                     console.log("Attempting Transcription");
                     // SENDING MOST RECENT BLOB TO BACKEND
-                    transcibe(audio_chunks[audio_chunks.length - 1]);
-                    // TEST
+                    if (audio_chunks.length > 0) {
+                        transcibe(audio_chunks[audio_chunks.length - 1]);
+                    }
                 }
             };
             media_recorder.start(3000); // Trigger `ondataavailable` every 3 seconds
@@ -170,8 +171,8 @@ function record_from_blackhole() {
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            //console.log("Attempting switch audio output to Blackhole");
-            //switch_output_device("blackhole");
+            console.log("Attempting switch audio output to Blackhole");
+            switch_output_device("blackhole");
             console.log("Attempting to listen to blackhole audio input");
             const rec = record_from_blackhole();
             console.log("Attempting to create 10 seconds worth of audioblobs");

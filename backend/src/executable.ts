@@ -6,6 +6,65 @@ import cors from "cors";
 import { stdout } from "process";
 import fs from "fs";
 import os from "os";
+import axios from 'axios';
+import { fileTypeFromBuffer } from 'file-type';
+
+
+const baseUrl = 'https://api.assemblyai.com/v2'
+
+const headers = {
+  authorization: 'YOUR_API_KEY_HERE', // TODO: replace with API key
+}
+
+
+export interface Data_Input {
+    audio: string
+}
+
+async function isAudioFile(buffer: Buffer<ArrayBufferLike>): Promise<boolean> {
+    const type = await fileTypeFromBuffer(buffer);
+    return type ? type.mime.startsWith('audio/') : false;
+  };
+
+async function runTranscribe(audioData: Buffer<ArrayBufferLike>): Promise<void> {
+    const uploadResponse = await axios.post(`${baseUrl}/upload`, audioData, {
+        headers
+    })
+    const uploadUrl = uploadResponse.data.upload_url
+
+    const data = {
+        audio_url: uploadUrl // You can also use a URL to an audio or video file on the web
+    }
+
+    const url = `${baseUrl}/transcript`
+    const response = await axios.post(url, data, { headers: headers })
+
+    const transcriptId = response.data.id
+    const pollingEndpoint = `${baseUrl}/transcript/${transcriptId}`
+
+    while (true) {
+    const pollingResponse = await axios.get(pollingEndpoint, {
+        headers: headers
+    })
+    const transcriptionResult = pollingResponse.data
+
+    if (transcriptionResult.status === 'completed') {
+        console.log(transcriptionResult.text)
+        break
+    } else if (transcriptionResult.status === 'error') {
+        throw new Error(`Transcription failed: ${transcriptionResult.error}`)
+    } else {
+        await new Promise((resolve) => setTimeout(resolve, 3000))
+    }
+    }
+}
+
+async function AssemblyTranscribe(filepath: string) : Promise<void> {
+    const audioData = await fs.readFileSync(filepath);
+    isAudioFile(audioData).then(isAudio =>
+        runTranscribe(audioData)
+    )
+}
 
 const __filename = fileURLToPath(import.meta.url); // Get the current file path
 const __dirname = path.dirname(__filename);       // Get the directory name
@@ -18,6 +77,7 @@ const PORT = 3000;
 
 // Endpoint to run the audio control logic
 app.get("/run-audio-control", (req, res) => {
+    console.log("starting enpoint!\n");
     const device = req.query.device || "macbook";
     const executablePath = path.resolve(__dirname, "../build/audio_control");
 
@@ -40,28 +100,14 @@ app.get("/run-audio-control", (req, res) => {
 app.post("/receive-audio", express.raw({ type: "audio/webm", limit: "10mb" }), (req, res) => {
     try {
         console.log("Audio transcription endpoint running");
-        const executablePath = path.resolve(__dirname, "../py/app.py");
  
         // Write the audio blob to a temporary file
         const tempFilePath = path.join(os.tmpdir(), `audio_${Date.now()}.webm`);
         fs.writeFileSync(tempFilePath, req.body);
         console.log(`Audio file saved to ${tempFilePath}`);
 
-        execFile("python", [executablePath, tempFilePath], (error: any, stdout: any, stderr: any) => {
-            // Clean up the temporary file after processing
-            fs.unlinkSync(tempFilePath);
+        AssemblyTranscribe(tempFilePath);
 
-            if (error) {
-                console.error(`Error running Python script: ${error.message}`);
-                return res.status(500).send("Error processing audio.");
-            }
-            if (stderr) {
-                console.error(`Python script error: ${stderr}`);
-                return res.status(500).send("Python script error.");
-            }
-            console.log("Python script output:", stdout);
-            res.status(200).send({ transcription: stdout.trim() }); // Send transcription or other output
-        });
     } catch (error) {
         console.error("Error in /receive-audio endpoint:", error);
         res.status(500).send("Internal Server Error");
