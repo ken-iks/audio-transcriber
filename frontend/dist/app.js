@@ -7,6 +7,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+/**
+ *
+ * Goal: Build a free real time transcription service that just runs as continous partial transcription (which I can get for free)
+ *       This will be the full scope of the project so that I can move on to something more interesting
+ */
 console.log("Script loaded");
 function get_media() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -88,18 +93,18 @@ function play(stream) {
 /**
  * Send audio chunks to backend for transcription
  */
-function transcibe(event_data) {
+function transcribe(event_data) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const response = fetch("http://localhost:3000/receive-audio", {
                 method: "POST",
                 body: event_data,
                 headers: {
-                    "Content-Type": "audio/webm",
+                    "Content-Type": "audio/ogg",
                 },
             });
-            //const result = await (await response).json();
-            //console.log("Transcription result:", result.transcription);
+            const result = yield (yield response).json();
+            console.log("Transcription result:", result.transcription);
         }
         catch (error) {
             console.error("Error communicating with backend:", error);
@@ -121,31 +126,29 @@ function send_blobs(stream) {
                 if (event.data.size > 0) {
                     audio_chunks.push(event.data);
                     console.log("Audio chunk created:", event.data);
-                    console.log("Attempting Transcription");
-                    // SENDING MOST RECENT BLOB TO BACKEND
-                    if (audio_chunks.length > 0) {
-                        transcibe(audio_chunks[audio_chunks.length - 1]);
-                    }
                 }
             };
-            media_recorder.start(3000); // Trigger `ondataavailable` every 3 seconds
+            media_recorder.start(100); // Start recording
             is_recording = true;
             console.log("Recording started...");
         },
         stop: () => {
             if (!is_recording || !media_recorder) {
                 console.warn("No recording is in progress to stop.");
-                return null;
+                return Promise.resolve(null);
             }
-            media_recorder.stop();
-            is_recording = false;
-            console.log("Recording stopped.");
-            const final_blob = new Blob(audio_chunks, { type: "audio/webm" });
-            console.log("Final Blob:", final_blob);
-            // Reset audio_chunks for the next recording session
-            audio_chunks = [];
-            // Return the final blob for further processing
-            return final_blob;
+            return new Promise((resolve) => {
+                media_recorder.onstop = () => {
+                    const final_blob = new Blob(audio_chunks, { type: "audio/ogg; codecs=opus" });
+                    console.log("Final Blob:", final_blob);
+                    // Reset for the next recording session
+                    audio_chunks = [];
+                    resolve(final_blob);
+                };
+                media_recorder.stop();
+                is_recording = false;
+                console.log("Recording stopped...");
+            });
         }
     };
 }
@@ -160,7 +163,7 @@ function record_from_blackhole() {
             });
             console.log("MEDIA LOG GOTTEN");
             console.log(media_stream);
-            return send_blobs(media_stream);
+            return media_stream;
         }
         catch (error) {
             console.error("Couldn't resolve blackhole input:", error);
@@ -170,26 +173,46 @@ function record_from_blackhole() {
 }
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
+        let recorder = null;
         try {
             console.log("Attempting switch audio output to Blackhole");
             switch_output_device("blackhole");
-            console.log("Attempting to listen to blackhole audio input");
-            const rec = record_from_blackhole();
-            console.log("Attempting to create 10 seconds worth of audioblobs");
-            (rec).then((x) => {
-                if (x) {
-                    x.start();
-                    setTimeout(() => {
-                        const finalBlob = x.stop();
-                        if (finalBlob) {
-                            console.log("Final Blob:", finalBlob);
-                        }
-                    }, 10000);
+            let blackholeInputStream = null;
+            document.getElementById("recordButton-1").addEventListener("click", () => __awaiter(this, void 0, void 0, function* () {
+                if (recorder) {
+                    console.warn("A recording session is already in progress.");
+                    return;
                 }
-            });
+                console.log("Attempting to listen to blackhole audio input");
+                blackholeInputStream = yield record_from_blackhole();
+                if (blackholeInputStream) {
+                    console.log("Blackhole stream obtained");
+                    recorder = send_blobs(blackholeInputStream);
+                    recorder.start();
+                    console.log("Recording started...");
+                }
+                else {
+                    console.error("Failed to obtain blackhole audio stream.");
+                }
+            }));
+            document.getElementById("recordButton-2").addEventListener("click", () => __awaiter(this, void 0, void 0, function* () {
+                if (!recorder) {
+                    console.warn("No recording session to stop.");
+                    return;
+                }
+                console.log("Stopping recording...");
+                const finalBlob = yield recorder.stop();
+                if (finalBlob) {
+                    console.log("Final recorded audio blob:", finalBlob);
+                    transcribe(finalBlob); // Run transcription after recording ends
+                }
+                // Reset recorder
+                recorder = null;
+            }));
             return 0;
         }
-        catch (_a) {
+        catch (error) {
+            console.error("Error in main function:", error);
             return -1;
         }
     });

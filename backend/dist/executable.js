@@ -12,14 +12,13 @@ import { execFile } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
-import { stdout } from "process";
 import fs from "fs";
 import os from "os";
 import axios from 'axios';
 import { fileTypeFromBuffer } from 'file-type';
 const baseUrl = 'https://api.assemblyai.com/v2';
 const headers = {
-    authorization: '76fe59768f074bd4b3b8cff820da93db',
+    authorization: '76fe59768f074bd4b3b8cff820da93db', // TODO: replace with API key
 };
 function isAudioFile(buffer) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -28,9 +27,11 @@ function isAudioFile(buffer) {
     });
 }
 ;
-function runTranscribe(audioData) {
+function runTranscribe(filepath) {
     return __awaiter(this, void 0, void 0, function* () {
-        const uploadResponse = yield axios.post(`${baseUrl}/upload`, audioData, {
+        const formData = new FormData();
+        formData.append("file", fs.createReadStream(filepath));
+        const uploadResponse = yield axios.post(`${baseUrl}/upload`, formData, {
             headers
         });
         const uploadUrl = uploadResponse.data.upload_url;
@@ -62,7 +63,7 @@ function runTranscribe(audioData) {
 function AssemblyTranscribe(filepath) {
     return __awaiter(this, void 0, void 0, function* () {
         const audioData = yield fs.readFileSync(filepath);
-        isAudioFile(audioData).then(isAudio => runTranscribe(audioData));
+        isAudioFile(audioData).then(isAudio => runTranscribe(filepath));
     });
 }
 const __filename = fileURLToPath(import.meta.url); // Get the current file path
@@ -74,7 +75,6 @@ app.use(cors({
 const PORT = 3000;
 // Endpoint to run the audio control logic
 app.get("/run-audio-control", (req, res) => {
-    console.log("starting enpoint!\n");
     const device = req.query.device || "macbook";
     const executablePath = path.resolve(__dirname, "../build/audio_control");
     execFile(executablePath, [device], (error, stdout, stderr) => {
@@ -85,18 +85,20 @@ app.get("/run-audio-control", (req, res) => {
         if (stderr) {
             console.warn("Warning from audio_control:", stderr);
         }
+        res.status(200).send(stdout || "Execution completed with no output");
     });
-    res.status(200).send(stdout);
 });
 // Endpoint to run audio transcription logic
-app.post("/receive-audio", express.raw({ type: "audio/webm", limit: "10mb" }), (req, res) => {
+app.post("/receive-audio", express.raw({ type: "audio/ogg", limit: "10mb" }), (req, res) => {
     try {
         console.log("Audio transcription endpoint running");
+        console.log("Received audio buffer:", req.body);
+        console.log("Buffer length:", req.body.length);
         // Write the audio blob to a temporary file
-        const tempFilePath = path.join(os.tmpdir(), `audio_${Date.now()}.webm`);
+        const tempFilePath = path.join(os.tmpdir(), `audio_${Date.now()}.ogg`);
         fs.writeFileSync(tempFilePath, req.body);
         console.log(`Audio file saved to ${tempFilePath}`);
-        AssemblyTranscribe(tempFilePath);
+        //AssemblyTranscribe(tempFilePath);
     }
     catch (error) {
         console.error("Error in /receive-audio endpoint:", error);

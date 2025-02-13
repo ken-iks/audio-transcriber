@@ -13,7 +13,7 @@ import { fileTypeFromBuffer } from 'file-type';
 const baseUrl = 'https://api.assemblyai.com/v2'
 
 const headers = {
-  authorization: 'YOUR_API_KEY_HERE', // TODO: replace with API key
+  authorization: 'YOUR_API_KEY', // TODO: replace with API key
 }
 
 
@@ -26,8 +26,11 @@ async function isAudioFile(buffer: Buffer<ArrayBufferLike>): Promise<boolean> {
     return type ? type.mime.startsWith('audio/') : false;
   };
 
-async function runTranscribe(audioData: Buffer<ArrayBufferLike>): Promise<void> {
-    const uploadResponse = await axios.post(`${baseUrl}/upload`, audioData, {
+async function runTranscribe(filepath: string): Promise<void> {
+    const formData = new FormData();
+    formData.append("file", fs.createReadStream(filepath));
+
+    const uploadResponse = await axios.post(`${baseUrl}/upload`, formData, {
         headers
     })
     const uploadUrl = uploadResponse.data.upload_url
@@ -43,26 +46,26 @@ async function runTranscribe(audioData: Buffer<ArrayBufferLike>): Promise<void> 
     const pollingEndpoint = `${baseUrl}/transcript/${transcriptId}`
 
     while (true) {
-    const pollingResponse = await axios.get(pollingEndpoint, {
-        headers: headers
-    })
-    const transcriptionResult = pollingResponse.data
+        const pollingResponse = await axios.get(pollingEndpoint, {
+            headers: headers
+        })
+        const transcriptionResult = pollingResponse.data
 
-    if (transcriptionResult.status === 'completed') {
-        console.log(transcriptionResult.text)
-        break
-    } else if (transcriptionResult.status === 'error') {
-        throw new Error(`Transcription failed: ${transcriptionResult.error}`)
-    } else {
-        await new Promise((resolve) => setTimeout(resolve, 3000))
-    }
+        if (transcriptionResult.status === 'completed') {
+            console.log(transcriptionResult.text)
+            break
+        } else if (transcriptionResult.status === 'error') {
+            throw new Error(`Transcription failed: ${transcriptionResult.error}`)
+        } else {
+            await new Promise((resolve) => setTimeout(resolve, 3000))
+        }
     }
 }
 
 async function AssemblyTranscribe(filepath: string) : Promise<void> {
     const audioData = await fs.readFileSync(filepath);
     isAudioFile(audioData).then(isAudio =>
-        runTranscribe(audioData)
+        runTranscribe(filepath)
     )
 }
 
@@ -77,7 +80,6 @@ const PORT = 3000;
 
 // Endpoint to run the audio control logic
 app.get("/run-audio-control", (req, res) => {
-    console.log("starting enpoint!\n");
     const device = req.query.device || "macbook";
     const executablePath = path.resolve(__dirname, "../build/audio_control");
 
@@ -91,22 +93,26 @@ app.get("/run-audio-control", (req, res) => {
             console.warn("Warning from audio_control:", stderr);
         }
 
+        res.status(200).send(stdout || "Execution completed with no output");
     });
-    res.status(200).send(stdout);
 });
 
 
 // Endpoint to run audio transcription logic
-app.post("/receive-audio", express.raw({ type: "audio/webm", limit: "10mb" }), (req, res) => {
+app.post("/receive-audio", express.raw({ type: "audio/ogg", limit: "10mb" }), (req, res) => {
     try {
         console.log("Audio transcription endpoint running");
+        console.log("Received audio buffer:", req.body);
+        console.log("Buffer length:", req.body.length);
  
         // Write the audio blob to a temporary file
-        const tempFilePath = path.join(os.tmpdir(), `audio_${Date.now()}.webm`);
+        const tempFilePath = path.join(os.tmpdir(), `audio_${Date.now()}.ogg`);
+        
+
         fs.writeFileSync(tempFilePath, req.body);
         console.log(`Audio file saved to ${tempFilePath}`);
 
-        AssemblyTranscribe(tempFilePath);
+        //AssemblyTranscribe(tempFilePath);
 
     } catch (error) {
         console.error("Error in /receive-audio endpoint:", error);
