@@ -26,14 +26,14 @@ function get_media() {
         return media_arr;
     });
 }
-function get_virtual_input() {
+function get_physical_input() {
     return __awaiter(this, void 0, void 0, function* () {
         const media_arr = yield get_media();
         console.log(media_arr);
         for (let i = 0; i < media_arr.length; i++) {
             let device = media_arr[i];
             console.log("DEVICE ", i, " is called: ", device.label);
-            if (device.label.includes("BlackHole")) {
+            if (device.label.includes("MacBook")) {
                 console.log("Virtual input ID recieved");
                 return device.deviceId;
             }
@@ -117,6 +117,7 @@ function send_blobs(stream) {
     let is_recording = false;
     return {
         start: () => {
+            play(stream);
             if (is_recording) {
                 console.warn("Recording is already in progress.");
                 return;
@@ -152,18 +153,29 @@ function send_blobs(stream) {
         }
     };
 }
-function record_from_blackhole() {
+/**
+ * TODO: Fix MediaRecorder
+ * Audio plays from blackhole but it is not being recorded properly from blackhole input
+ * When I try recording in quicktime player, it works fine, but when I play the file
+ * produced from the audio blobs created with the MediaRecorder - static plays
+ */
+function record_from_speaker() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            let virtual_input_id;
-            virtual_input_id = yield get_virtual_input();
-            console.log("BLACKHOLE INPUT ID: ", virtual_input_id);
-            const media_stream = yield navigator.mediaDevices.getUserMedia({
-                audio: { deviceId: virtual_input_id }
+            let virtual_input_id = yield get_physical_input();
+            const stream = yield navigator.mediaDevices.getUserMedia({
+                audio: {
+                    deviceId: virtual_input_id,
+                    channelCount: 2, // Stereo sound
+                    sampleRate: 44100, // CD Quality
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false
+                }
             });
             console.log("MEDIA LOG GOTTEN");
-            console.log(media_stream);
-            return media_stream;
+            console.log(stream);
+            return stream;
         }
         catch (error) {
             console.error("Couldn't resolve blackhole input:", error);
@@ -175,8 +187,8 @@ function main() {
     return __awaiter(this, void 0, void 0, function* () {
         let recorder = null;
         try {
-            console.log("Attempting switch audio output to Blackhole");
-            switch_output_device("blackhole");
+            //console.log("Attempting switch audio output to Blackhole");
+            //switch_output_device("macbook");
             let blackholeInputStream = null;
             document.getElementById("recordButton-1").addEventListener("click", () => __awaiter(this, void 0, void 0, function* () {
                 if (recorder) {
@@ -184,7 +196,7 @@ function main() {
                     return;
                 }
                 console.log("Attempting to listen to blackhole audio input");
-                blackholeInputStream = yield record_from_blackhole();
+                blackholeInputStream = yield record_from_speaker();
                 if (blackholeInputStream) {
                     console.log("Blackhole stream obtained");
                     recorder = send_blobs(blackholeInputStream);

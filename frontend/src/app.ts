@@ -22,13 +22,13 @@ async function get_media(): Promise<Array<MediaDeviceInfo>> {
     return media_arr;
 }
 
-async function get_virtual_input(): Promise<string> {
+async function get_physical_input(): Promise<string> {
     const media_arr = await get_media();
     console.log(media_arr);
     for (let i=0; i<media_arr.length; i++) {
         let device = media_arr[i];
         console.log("DEVICE ", i, " is called: ", device.label);
-        if (device.label.includes("BlackHole")) {
+        if (device.label.includes("MacBook")) {
             console.log("Virtual input ID recieved");
             return device.deviceId;
         } 
@@ -124,6 +124,9 @@ function send_blobs(stream: MediaStream): Recorder {
 
     return {
         start: () => {
+
+            play(stream);
+
             if (is_recording) {
                 console.warn("Recording is already in progress.");
                 return;
@@ -174,19 +177,25 @@ function send_blobs(stream: MediaStream): Recorder {
  * produced from the audio blobs created with the MediaRecorder - static plays
  */
 
-async function record_from_blackhole(): Promise<MediaStream | null> {
+async function record_from_speaker(): Promise<MediaStream | null> {
     try {
-        let virtual_input_id: string;
-        virtual_input_id = await get_virtual_input();
-        console.log("BLACKHOLE INPUT ID: ", virtual_input_id);
-        const media_stream = await navigator.mediaDevices.getUserMedia({ 
-            audio: { deviceId: virtual_input_id } 
+        let virtual_input_id: string = await get_physical_input()
+            
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                deviceId: virtual_input_id,
+                channelCount: 2, // Stereo sound
+                sampleRate: 44100, // CD Quality
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false
+            }
         });
-        console.log("MEDIA LOG GOTTEN");
-        console.log(media_stream);
-        return media_stream
-
-    } catch (error) {
+        console.log("MEDIA LOG GOTTEN")
+        console.log(stream)
+        return stream
+    }  
+    catch (error) {
         console.error("Couldn't resolve blackhole input:", error);
         return null;
     } 
@@ -196,8 +205,8 @@ async function main(): Promise<number> {
     let recorder: Recorder | null = null;
 
     try {
-        console.log("Attempting switch audio output to Blackhole");
-        switch_output_device("blackhole");
+        //console.log("Attempting switch audio output to Blackhole");
+        //switch_output_device("macbook");
 
         let blackholeInputStream: MediaStream | null = null;
 
@@ -209,7 +218,7 @@ async function main(): Promise<number> {
 
             console.log("Attempting to listen to blackhole audio input");
 
-            blackholeInputStream = await record_from_blackhole();
+            blackholeInputStream = await record_from_speaker();
 
             if (blackholeInputStream) {
                 console.log("Blackhole stream obtained");

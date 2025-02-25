@@ -1,5 +1,5 @@
 import express from "express";
-import { execFile } from "child_process";
+import { execFile, execSync } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
@@ -9,12 +9,6 @@ import os from "os";
 import axios from 'axios';
 import { fileTypeFromBuffer } from 'file-type';
 
-
-const baseUrl = 'https://api.assemblyai.com/v2'
-
-const headers = {
-  authorization: 'YOUR_API_KEY', // TODO: replace with API key
-}
 
 
 export interface Data_Input {
@@ -26,40 +20,25 @@ async function isAudioFile(buffer: Buffer<ArrayBufferLike>): Promise<boolean> {
     return type ? type.mime.startsWith('audio/') : false;
   };
 
-async function runTranscribe(filepath: string): Promise<void> {
-    const formData = new FormData();
-    formData.append("file", fs.createReadStream(filepath));
+  async function runTranscribe(filepath: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const scriptPath = path.join(__dirname, 'transcribe.py'); // Ensure correct path
+        const command = `/Users/bigkenz/anaconda3/bin/python3 ${scriptPath} "${filepath}"`;
 
-    const uploadResponse = await axios.post(`${baseUrl}/upload`, formData, {
-        headers
-    })
-    const uploadUrl = uploadResponse.data.upload_url
+        execFile(command, (error, stdout, stderr) => {
+            if (error) {
+                reject(`Error executing script: ${error.message}`);
+                return;
+            }
+            if (stderr) {
+                reject(`Script error: ${stderr}`);
+                return;
+            }
 
-    const data = {
-        audio_url: uploadUrl // You can also use a URL to an audio or video file on the web
-    }
-
-    const url = `${baseUrl}/transcript`
-    const response = await axios.post(url, data, { headers: headers })
-
-    const transcriptId = response.data.id
-    const pollingEndpoint = `${baseUrl}/transcript/${transcriptId}`
-
-    while (true) {
-        const pollingResponse = await axios.get(pollingEndpoint, {
-            headers: headers
-        })
-        const transcriptionResult = pollingResponse.data
-
-        if (transcriptionResult.status === 'completed') {
-            console.log(transcriptionResult.text)
-            break
-        } else if (transcriptionResult.status === 'error') {
-            throw new Error(`Transcription failed: ${transcriptionResult.error}`)
-        } else {
-            await new Promise((resolve) => setTimeout(resolve, 3000))
-        }
-    }
+            console.log("Transcription:", stdout.trim());
+            resolve();
+        });
+    });
 }
 
 async function AssemblyTranscribe(filepath: string) : Promise<void> {
@@ -107,12 +86,13 @@ app.post("/receive-audio", express.raw({ type: "audio/ogg", limit: "10mb" }), (r
  
         // Write the audio blob to a temporary file
         const tempFilePath = path.join(os.tmpdir(), `audio_${Date.now()}.ogg`);
-        
-
         fs.writeFileSync(tempFilePath, req.body);
-        console.log(`Audio file saved to ${tempFilePath}`);
 
-        //AssemblyTranscribe(tempFilePath);
+        const oggFilePath = tempFilePath.replace(".ogg", "_converted.ogg");
+        execSync(`ffmpeg -i ${tempFilePath} -acodec libopus ${oggFilePath}`);
+        console.log(`Audio file saved to ${oggFilePath}`);
+
+        AssemblyTranscribe(oggFilePath);
 
     } catch (error) {
         console.error("Error in /receive-audio endpoint:", error);
