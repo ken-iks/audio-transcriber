@@ -93,7 +93,7 @@ async function record_from_speaker(): Promise<MediaStream | null> {
         return stream
     }  
     catch (error) {
-        console.error("Couldn't resolve blackhole input:", error);
+        console.error("Couldn't resolve speaker input:", error);
         return null;
     } 
 }
@@ -226,7 +226,7 @@ async function main(): Promise<number> {
     let recorder: Recorder | null = null;
 
     try {
-        let blackholeInputStream: MediaStream | null = null;
+        let inputStream: MediaStream | null = null;
 
         document.getElementById("recordButton-1")!.addEventListener("click", async () => {
             if (recorder) {
@@ -234,17 +234,17 @@ async function main(): Promise<number> {
                 return;
             }
 
-            console.log("Attempting to listen to blackhole audio input");
+            console.log("Attempting to listen to audio input");
 
-            blackholeInputStream = await record_from_speaker();
+            inputStream = await record_from_speaker();
 
-            if (blackholeInputStream) {
-                console.log("Blackhole stream obtained");
-                recorder = send_blobs(blackholeInputStream);
+            if (inputStream) {
+                console.log("Stream obtained");
+                recorder = send_blobs(inputStream);
                 recorder.start();
                 console.log("Recording started...");
             } else {
-                console.error("Failed to obtain blackhole audio stream.");
+                console.error("Failed to obtain audio stream.");
             }
         });
 
@@ -261,11 +261,11 @@ async function main(): Promise<number> {
                 console.log("Final recorded audio blob:", finalBlob);
                 const transcriptionResults = await transcribe(finalBlob); // Run transcription after recording ends
 
+                // display transcription on screen
                 const transcriptionDiv = document.getElementById("transcription");
                 if (transcriptionDiv) {
                     transcriptionDiv.textContent = transcriptionResults;
                 }
-                // display transcription on screen
             }
 
             // Reset recorder

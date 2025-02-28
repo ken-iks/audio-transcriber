@@ -100,7 +100,7 @@ function record_from_speaker() {
             return stream;
         }
         catch (error) {
-            console.error("Couldn't resolve blackhole input:", error);
+            console.error("Couldn't resolve speaker input:", error);
             return null;
         }
     });
@@ -211,22 +211,22 @@ function main() {
     return __awaiter(this, void 0, void 0, function* () {
         let recorder = null;
         try {
-            let blackholeInputStream = null;
+            let inputStream = null;
             document.getElementById("recordButton-1").addEventListener("click", () => __awaiter(this, void 0, void 0, function* () {
                 if (recorder) {
                     console.warn("A recording session is already in progress.");
                     return;
                 }
-                console.log("Attempting to listen to blackhole audio input");
-                blackholeInputStream = yield record_from_speaker();
-                if (blackholeInputStream) {
-                    console.log("Blackhole stream obtained");
-                    recorder = send_blobs(blackholeInputStream);
+                console.log("Attempting to listen to audio input");
+                inputStream = yield record_from_speaker();
+                if (inputStream) {
+                    console.log("Stream obtained");
+                    recorder = send_blobs(inputStream);
                     recorder.start();
                     console.log("Recording started...");
                 }
                 else {
-                    console.error("Failed to obtain blackhole audio stream.");
+                    console.error("Failed to obtain audio stream.");
                 }
             }));
             document.getElementById("recordButton-2").addEventListener("click", () => __awaiter(this, void 0, void 0, function* () {
