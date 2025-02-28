@@ -1,3 +1,9 @@
+"use strict";
+/**
+ *
+ * Goal: Build a free transcription service.
+ *
+ */
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -7,12 +13,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+console.log("Script loaded");
 /**
  *
- * Goal: Build a free real time transcription service that just runs as continous partial transcription (which I can get for free)
- *       This will be the full scope of the project so that I can move on to something more interesting
+ * Helper functions for interacting with device I/O functions
+ * Utilizes some scripts written in C++ to interact with the hardware
+ *
  */
-console.log("Script loaded");
+// List all I/O media devices associated with Computer
 function get_media() {
     return __awaiter(this, void 0, void 0, function* () {
         let media_arr = [];
@@ -26,6 +34,7 @@ function get_media() {
         return media_arr;
     });
 }
+// Get the device ID of the physical speaker input
 function get_physical_input() {
     return __awaiter(this, void 0, void 0, function* () {
         const media_arr = yield get_media();
@@ -42,7 +51,7 @@ function get_physical_input() {
         return "";
     });
 }
-// Will use to eventually output edited streams 
+// Get the device ID of the physical speaker output
 function get_physical_output() {
     return __awaiter(this, void 0, void 0, function* () {
         let media_arr = [];
@@ -57,12 +66,13 @@ function get_physical_output() {
         return "";
     });
 }
+// Function for switching output device
 function switch_output_device(device) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const response = yield fetch(`http://localhost:3000/run-audio-control?device=${device}`);
-            //const output = await response.text();
-            //console.log("Output from server:", output);
+            const output = yield response.text();
+            console.log("Output from server:", output);
         }
         catch (error) {
             console.error("Error communicating with backend:", error);
@@ -70,9 +80,34 @@ function switch_output_device(device) {
     });
 }
 ;
+// Function for switching input device
+function record_from_speaker() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            let virtual_input_id = yield get_physical_input();
+            const stream = yield navigator.mediaDevices.getUserMedia({
+                audio: {
+                    deviceId: virtual_input_id,
+                    channelCount: 2, // Stereo sound
+                    sampleRate: 44100, // CD Quality
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false
+                }
+            });
+            console.log("MEDIA LOG GOTTEN");
+            console.log(stream);
+            return stream;
+        }
+        catch (error) {
+            console.error("Couldn't resolve blackhole input:", error);
+            return null;
+        }
+    });
+}
 /**
  *
- * Testing the input stream by generating audio visulization
+ * Helper function for testing levels on input stream
  */
 function play(stream) {
     const context = new AudioContext();
@@ -95,6 +130,17 @@ function play(stream) {
  */
 function transcribe(event_data) {
     return __awaiter(this, void 0, void 0, function* () {
+        const transciptionElement = document.getElementById("transcription");
+        if (!transciptionElement) {
+            return "";
+        }
+        transciptionElement.textContent = "";
+        const mySpinnerElement = document.getElementById('spinner');
+        if (!mySpinnerElement) {
+            return "";
+        }
+        mySpinnerElement.classList.remove('hidden');
+        mySpinnerElement.removeAttribute('aria-hidden');
         try {
             const response = fetch("http://localhost:3000/receive-audio", {
                 method: "POST",
@@ -103,11 +149,17 @@ function transcribe(event_data) {
                     "Content-Type": "audio/ogg",
                 },
             });
-            const result = yield (yield response).json();
-            console.log("Transcription result:", result.transcription);
+            const result = yield (yield response).text();
+            console.log("Transcription result:", result);
+            mySpinnerElement.classList.add('hidden');
+            mySpinnerElement.setAttribute('aria-hidden', 'true');
+            return result;
         }
         catch (error) {
             console.error("Error communicating with backend:", error);
+            mySpinnerElement.classList.add('hidden');
+            mySpinnerElement.setAttribute('aria-hidden', 'true');
+            return "";
         }
     });
 }
@@ -117,7 +169,6 @@ function send_blobs(stream) {
     let is_recording = false;
     return {
         start: () => {
-            play(stream);
             if (is_recording) {
                 console.warn("Recording is already in progress.");
                 return;
@@ -154,41 +205,12 @@ function send_blobs(stream) {
     };
 }
 /**
- * TODO: Fix MediaRecorder
- * Audio plays from blackhole but it is not being recorded properly from blackhole input
- * When I try recording in quicktime player, it works fine, but when I play the file
- * produced from the audio blobs created with the MediaRecorder - static plays
+ *
  */
-function record_from_speaker() {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            let virtual_input_id = yield get_physical_input();
-            const stream = yield navigator.mediaDevices.getUserMedia({
-                audio: {
-                    deviceId: virtual_input_id,
-                    channelCount: 2, // Stereo sound
-                    sampleRate: 44100, // CD Quality
-                    echoCancellation: false,
-                    noiseSuppression: false,
-                    autoGainControl: false
-                }
-            });
-            console.log("MEDIA LOG GOTTEN");
-            console.log(stream);
-            return stream;
-        }
-        catch (error) {
-            console.error("Couldn't resolve blackhole input:", error);
-            return null;
-        }
-    });
-}
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         let recorder = null;
         try {
-            //console.log("Attempting switch audio output to Blackhole");
-            //switch_output_device("macbook");
             let blackholeInputStream = null;
             document.getElementById("recordButton-1").addEventListener("click", () => __awaiter(this, void 0, void 0, function* () {
                 if (recorder) {
@@ -216,7 +238,12 @@ function main() {
                 const finalBlob = yield recorder.stop();
                 if (finalBlob) {
                     console.log("Final recorded audio blob:", finalBlob);
-                    transcribe(finalBlob); // Run transcription after recording ends
+                    const transcriptionResults = yield transcribe(finalBlob); // Run transcription after recording ends
+                    const transcriptionDiv = document.getElementById("transcription");
+                    if (transcriptionDiv) {
+                        transcriptionDiv.textContent = transcriptionResults;
+                    }
+                    // display transcription on screen
                 }
                 // Reset recorder
                 recorder = null;
@@ -230,5 +257,4 @@ function main() {
     });
 }
 main();
-export {};
 //# sourceMappingURL=app.js.map

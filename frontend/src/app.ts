@@ -1,13 +1,19 @@
-import { start } from './visualizer.js';
-
 /**
  * 
- * Goal: Build a free real time transcription service that just runs as continous partial transcription (which I can get for free)
- *       This will be the full scope of the project so that I can move on to something more interesting
+ * Goal: Build a free transcription service. 
+ *
  */
 
 console.log("Script loaded");
 
+/**
+ * 
+ * Helper functions for interacting with device I/O functions
+ * Utilizes some scripts written in C++ to interact with the hardware
+ * 
+ */
+
+// List all I/O media devices associated with Computer
 async function get_media(): Promise<Array<MediaDeviceInfo>> {
     let media_arr: Array<MediaDeviceInfo> = [];
     await navigator.mediaDevices.getUserMedia({audio: true});
@@ -22,6 +28,7 @@ async function get_media(): Promise<Array<MediaDeviceInfo>> {
     return media_arr;
 }
 
+// Get the device ID of the physical speaker input
 async function get_physical_input(): Promise<string> {
     const media_arr = await get_media();
     console.log(media_arr);
@@ -37,7 +44,7 @@ async function get_physical_input(): Promise<string> {
     return "";
 }
 
-// Will use to eventually output edited streams 
+// Get the device ID of the physical speaker output
 async function get_physical_output(): Promise<string> {
     let media_arr: Array<MediaDeviceInfo> = [];
     await navigator.mediaDevices.getUserMedia({audio: true});
@@ -53,11 +60,12 @@ async function get_physical_output(): Promise<string> {
     return "";
 }
 
+// Function for switching output device
 async function switch_output_device(device: string): Promise<void> {
     try {
         const response = await fetch(`http://localhost:3000/run-audio-control?device=${device}`);
-        //const output = await response.text();
-        //console.log("Output from server:", output);
+        const output = await response.text();
+        console.log("Output from server:", output);
 
     } catch (error) {
         console.error("Error communicating with backend:", error);
@@ -65,9 +73,34 @@ async function switch_output_device(device: string): Promise<void> {
     }
 };
 
+// Function for switching input device
+async function record_from_speaker(): Promise<MediaStream | null> {
+    try {
+        let virtual_input_id: string = await get_physical_input()
+            
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                deviceId: virtual_input_id,
+                channelCount: 2, // Stereo sound
+                sampleRate: 44100, // CD Quality
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false
+            }
+        });
+        console.log("MEDIA LOG GOTTEN")
+        console.log(stream)
+        return stream
+    }  
+    catch (error) {
+        console.error("Couldn't resolve blackhole input:", error);
+        return null;
+    } 
+}
+
 /**
  * 
- * Testing the input stream by generating audio visulization
+ * Helper function for testing levels on input stream
  */
 
 function play(stream: MediaStream): void {
@@ -101,7 +134,18 @@ interface Recorder {
  * Send audio chunks to backend for transcription
  */
 
-async function transcribe(event_data: Blob): Promise<void> {
+async function transcribe(event_data: Blob): Promise<string> {
+    const transciptionElement = document.getElementById("transcription")
+    if (!transciptionElement) {
+        return ""
+    }
+    transciptionElement.textContent = ""
+    const mySpinnerElement = document.getElementById('spinner');
+    if (!mySpinnerElement) {
+        return ""
+    }
+    mySpinnerElement.classList.remove('hidden');
+    mySpinnerElement.removeAttribute('aria-hidden');
     try {
         const response = fetch("http://localhost:3000/receive-audio", {
             method: "POST",
@@ -110,10 +154,16 @@ async function transcribe(event_data: Blob): Promise<void> {
                 "Content-Type": "audio/ogg",
             },
         });
-        const result = await (await response).json();
-        console.log("Transcription result:", result.transcription);
+        const result = await (await response).text()
+        console.log("Transcription result:", result);
+        mySpinnerElement.classList.add('hidden');
+        mySpinnerElement.setAttribute('aria-hidden', 'true');
+        return result;
     } catch (error) {
         console.error("Error communicating with backend:", error);
+        mySpinnerElement.classList.add('hidden');
+        mySpinnerElement.setAttribute('aria-hidden', 'true');
+        return  "";
     }
 }
 
@@ -124,9 +174,6 @@ function send_blobs(stream: MediaStream): Recorder {
 
     return {
         start: () => {
-
-            play(stream);
-
             if (is_recording) {
                 console.warn("Recording is already in progress.");
                 return;
@@ -158,7 +205,6 @@ function send_blobs(stream: MediaStream): Recorder {
 
                     // Reset for the next recording session
                     audio_chunks = [];
-
                     resolve(final_blob);
                 };
 
@@ -171,43 +217,15 @@ function send_blobs(stream: MediaStream): Recorder {
 }
 
 /**
- * TODO: Fix MediaRecorder
- * Audio plays from blackhole but it is not being recorded properly from blackhole input
- * When I try recording in quicktime player, it works fine, but when I play the file 
- * produced from the audio blobs created with the MediaRecorder - static plays
+ *
  */
 
-async function record_from_speaker(): Promise<MediaStream | null> {
-    try {
-        let virtual_input_id: string = await get_physical_input()
-            
-        const stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                deviceId: virtual_input_id,
-                channelCount: 2, // Stereo sound
-                sampleRate: 44100, // CD Quality
-                echoCancellation: false,
-                noiseSuppression: false,
-                autoGainControl: false
-            }
-        });
-        console.log("MEDIA LOG GOTTEN")
-        console.log(stream)
-        return stream
-    }  
-    catch (error) {
-        console.error("Couldn't resolve blackhole input:", error);
-        return null;
-    } 
-}
+
 
 async function main(): Promise<number> {
     let recorder: Recorder | null = null;
 
     try {
-        //console.log("Attempting switch audio output to Blackhole");
-        //switch_output_device("macbook");
-
         let blackholeInputStream: MediaStream | null = null;
 
         document.getElementById("recordButton-1")!.addEventListener("click", async () => {
@@ -241,7 +259,13 @@ async function main(): Promise<number> {
 
             if (finalBlob) {
                 console.log("Final recorded audio blob:", finalBlob);
-                transcribe(finalBlob); // Run transcription after recording ends
+                const transcriptionResults = await transcribe(finalBlob); // Run transcription after recording ends
+
+                const transcriptionDiv = document.getElementById("transcription");
+                if (transcriptionDiv) {
+                    transcriptionDiv.textContent = transcriptionResults;
+                }
+                // display transcription on screen
             }
 
             // Reset recorder

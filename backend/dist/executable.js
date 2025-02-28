@@ -15,10 +15,13 @@ import cors from "cors";
 import fs from "fs";
 import os from "os";
 import { fileTypeFromBuffer } from 'file-type';
-const baseUrl = 'https://api.assemblyai.com/v2';
-const headers = {
-    authorization: '76fe59768f074bd4b3b8cff820da93db', // TODO: replace with API key
-};
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const app = express();
+app.use(cors({
+    origin: "http://localhost:3001"
+}));
+const PORT = 3000;
 function isAudioFile(buffer) {
     return __awaiter(this, void 0, void 0, function* () {
         const type = yield fileTypeFromBuffer(buffer);
@@ -29,9 +32,9 @@ function isAudioFile(buffer) {
 function runTranscribe(filepath) {
     return __awaiter(this, void 0, void 0, function* () {
         return new Promise((resolve, reject) => {
-            const scriptPath = path.join(__dirname, 'transcribe.py'); // Ensure correct path
-            const command = `/Users/bigkenz/anaconda3/bin/python3 ${scriptPath} "${filepath}"`;
-            execFile(command, (error, stdout, stderr) => {
+            const pythonPath = "/Users/bigkenz/anaconda3/bin/python3";
+            const scriptPath = path.resolve(__dirname, "transcribe.py");
+            execFile(pythonPath, [scriptPath, filepath], (error, stdout, stderr) => {
                 if (error) {
                     reject(`Error executing script: ${error.message}`);
                     return;
@@ -40,8 +43,9 @@ function runTranscribe(filepath) {
                     reject(`Script error: ${stderr}`);
                     return;
                 }
-                console.log("Transcription:", stdout.trim());
-                resolve();
+                const transcription = stdout.trim(); // Capture transcription output
+                console.log("Transcription:", transcription);
+                resolve(transcription);
             });
         });
     });
@@ -49,16 +53,13 @@ function runTranscribe(filepath) {
 function AssemblyTranscribe(filepath) {
     return __awaiter(this, void 0, void 0, function* () {
         const audioData = yield fs.readFileSync(filepath);
-        isAudioFile(audioData).then(isAudio => runTranscribe(filepath));
+        let audioTest = yield isAudioFile(audioData);
+        if (audioTest) {
+            return runTranscribe(filepath);
+        }
+        return null;
     });
 }
-const __filename = fileURLToPath(import.meta.url); // Get the current file path
-const __dirname = path.dirname(__filename); // Get the directory name
-const app = express();
-app.use(cors({
-    origin: "http://localhost:3001" // Replace with your frontend's URL
-}));
-const PORT = 3000;
 // Endpoint to run the audio control logic
 app.get("/run-audio-control", (req, res) => {
     const device = req.query.device || "macbook";
@@ -86,7 +87,19 @@ app.post("/receive-audio", express.raw({ type: "audio/ogg", limit: "10mb" }), (r
         const oggFilePath = tempFilePath.replace(".ogg", "_converted.ogg");
         execSync(`ffmpeg -i ${tempFilePath} -acodec libopus ${oggFilePath}`);
         console.log(`Audio file saved to ${oggFilePath}`);
-        AssemblyTranscribe(oggFilePath);
+        function getTranscription() {
+            return __awaiter(this, void 0, void 0, function* () {
+                const responseString = yield AssemblyTranscribe(oggFilePath);
+                if (responseString) {
+                    res.send(responseString);
+                }
+                else {
+                    console.error("Error in /receive-audio endpoint:");
+                    res.status(500).send("Internal Server Error");
+                }
+            });
+        }
+        getTranscription();
     }
     catch (error) {
         console.error("Error in /receive-audio endpoint:", error);
