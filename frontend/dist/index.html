@@ -1,30 +1,87 @@
-<html>
-  <style>
-    /* Basic spinner styling */
-    .spinner {
-        display: inline-block;
-        width: 40px;
-        height: 40px;
-        border: 4px solid rgba(0, 0, 0, 0.1);
-        border-top-color: #000;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-    }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Transcriber</title>
+    <style>
+        /* Center the content */
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f9;
+            font-family: Arial, sans-serif;
+            margin: 0;
+        }
 
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
+        /* Button styling */
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 18px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease-in-out;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
 
-    /* Initially hide the spinner */
-    .hidden {
-        display: none;
-    }
-</style>
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #recordButton-2 {
+            background-color: #f44336;
+        }
+
+        #recordButton-2:hover {
+            background-color: #d32f2f;
+        }
+
+        /* Transcription Box */
+        #transcription {
+            width: 60%;
+            min-height: 50px;
+            background-color: white;
+            border-radius: 15px;
+            padding: 15px;
+            margin-top: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            overflow: hidden;
+            transition: all 0.3s ease-in-out;
+        }
+
+        /* Centered Spinner */
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-top-color: #000;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-top: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
 <body>
-  <script src="./app.js" type="module"></script>
-  <button id="recordButton-1"> START RECORDING </button>
-  <button id="recordButton-2"> STOP RECORDING </button>
-  <div id="transcription"></div>
-  <div id="spinner" class="spinner hidden" aria-hidden="true"></div>
+    <script src="app.js" type="module"></script>
+    <button id="recordButton-1">START RECORDING</button>
+    <button id="recordButton-2">STOP RECORDING</button>
+    <div id="transcription"></div>
+    <div id="spinner" class="spinner hidden" aria-hidden="true"></div>
 </body>
 </html>

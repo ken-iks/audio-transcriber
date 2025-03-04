@@ -239,11 +239,11 @@ function main() {
                 if (finalBlob) {
                     console.log("Final recorded audio blob:", finalBlob);
                     const transcriptionResults = yield transcribe(finalBlob); // Run transcription after recording ends
+                    // display transcription on screen
                     const transcriptionDiv = document.getElementById("transcription");
                     if (transcriptionDiv) {
                         transcriptionDiv.textContent = transcriptionResults;
                     }
-                    // display transcription on screen
                 }
                 // Reset recorder
                 recorder = null;
